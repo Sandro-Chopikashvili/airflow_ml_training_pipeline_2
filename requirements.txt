@@ -1,0 +1,16 @@
+apache-airflow
+apache-airflow-providers-postgres
+apache-airflow-providers-common-sql
+pendulum
+scipy
+mlflow
+psycopg2-binary
+sqlalchemy
+scikit-learn
+xgboost
+pandas
+numpy
+imbalanced-learn
+matplotlib
+seaborn
+kaggle
