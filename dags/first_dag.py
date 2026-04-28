@@ -56,6 +56,24 @@ def training_pipeline():
         return 'tables_created'
     
     @task
+    def validate_data():
+        df = pd.read_csv(url)
+        required_col = "default.payment.next.month"
+        if required_col not in df.columns:
+            raise ValueError(f"Missing column: {required_col}")
+            
+        if df["default.payment.next.month"].nunique() < 2:
+            raise ValueError("Target has no variation")
+
+        if df.isnull().mean().max() > 0.3:
+            raise ValueError("Too many missing values")
+        
+        if not set(df["default.payment.next.month"].unique()).issubset({0,1}):
+            raise ValueError("Target must be binary")
+
+        return "validated"
+    
+    @task
     def load_data():
         hook = PostgresHook(postgres_conn_id='data-postgres')
         engine = hook.get_sqlalchemy_engine()
@@ -275,8 +293,10 @@ def training_pipeline():
         return 'metrics_saved'
     
     created = create_tables()
+    validated = validate_data()
     loaded = load_data()
-    created >> loaded
+
+    created >> validated >> loaded
 
     rf_metrics = train_rf(loaded)
     xgb_metrics = train_xgb(loaded)
