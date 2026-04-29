@@ -2,23 +2,22 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import mlflow.pyfunc
 import pandas as pd
-import os
 
 app = FastAPI()
 
 model = None
 
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
-mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+mlflow.set_tracking_uri("http://mlflow:5000")
 
 def get_model():
     global model
     if model is None:
         try:
-            model = mlflow.pyfunc.load_model("models:/credit_card_model_classification@champion")
+            pyfunc_model = mlflow.pyfunc.load_model("models:/credit_card_model_classification@champion")
+            model = pyfunc_model.unwrap_python_model() 
         except Exception as e:
             raise HTTPException(status_code=503, detail=f"Model not ready: {str(e)}")
-    return model
+    return model  
 
 
 class PredictRequest(BaseModel):
@@ -52,20 +51,14 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/model-info")
-def model_info():
-    m = get_model()
-    return {"status": "loaded", "loader_module": m.metadata.flavors}
-
-
 @app.post("/predict")
 def predict(request: PredictRequest):
     m = get_model()
     df = pd.DataFrame([request.model_dump()])
     
     try:
-        proba = m.predict(df)
-        probability = float(proba[0])
+        proba = m.predict_proba(df)
+        probability = float(proba[0][1])
         return {
             "default_probability": round(probability, 4),
             "prediction": 1 if probability >= 0.5 else 0,
@@ -81,7 +74,7 @@ def predict_batch(requests: list[PredictRequest]):
     df = pd.DataFrame([r.model_dump() for r in requests])
     
     try:
-        probas = m.predict(df)
+        probas = m.predict_proba(df)
         return {
             "predictions": [
                 {
@@ -89,7 +82,7 @@ def predict_batch(requests: list[PredictRequest]):
                     "prediction": 1 if p >= 0.5 else 0,
                     "risk_level": "high" if p >= 0.7 else "medium" if p >= 0.4 else "low"
                 }
-                for p in probas
+                for p in probas[:, 1]
             ],
             "total": len(probas)
         }
