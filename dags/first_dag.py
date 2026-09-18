@@ -22,7 +22,7 @@ url = "/opt/airflow/dags/data/UCI_Credit_Card.csv"
 
 @DAG(
     dag_id='training_pipeline',
-    tags = ['ml','whazaap'],
+    tags = ['ml'],
     default_args={'retries':1, 'retry_delay': timedelta(minutes=5)},
     schedule='@daily',
     start_date=pendulum.datetime(2026,5,1, tz='UTC'),
